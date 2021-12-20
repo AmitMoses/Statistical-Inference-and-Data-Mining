@@ -209,104 +209,14 @@ for i, var in enumerate(categorical_cols):
 
 # Section 2: Feature Engineering
 
-## 2.1 Encoding categorical features
-"""
-
-print("Categorial type features:")
-plt.figure(figsize=(30, 30))
-plt.subplots_adjust(hspace=0.5)
-for i, var in enumerate(categorical_cols):
-    plt.subplot(11,4,i+1)
-    fig = house_df[tr_idx][var].hist(bins=60)
-    fig.set_ylabel('number of houses')
-    fig.set_xlabel(var)
-    str3= "".join([var,' Histogram'])
-    fig.set_title(str3)
-
-"""### 2.1.1 Factorizing categorical features"""
-
-def factorization(data, categorical_cols):
-  for c in categorical_cols:
-    data[c] = pd.factorize(data[c])[0]
-  return data
-
-house_df_fac = house_df
-house_df_fac = factorization(house_df_fac, categorical_cols)
-
-print("Categorial type features:")
-plt.figure(figsize=(30, 30))
-plt.subplots_adjust(hspace=0.5)
-for i, var in enumerate(categorical_cols):
-    plt.subplot(11,4,i+1)
-    fig = house_df[tr_idx][var].hist(bins=60)
-    fig.set_ylabel('number of houses')
-    fig.set_xlabel(var)
-    str3= "".join([var,' Histogram'])
-    fig.set_title(str3)
-
-"""### 2.1.2 Label encoding categorical features
-
-Another option is using Label Encoding which refers to transforming the word labels into numerical form so that the algorithms can understand how to operate on them.
-"""
-
-# house_df missing features
-print("house_df missing features")
-print("house_df shape: {}".format(train.shape))
-pd.set_option('display.max_rows', None)
-missing_data = pd.DataFrame(house_df[categorical_cols].isna().sum())
-missing_data_prec = missing_data/house_df[categorical_cols].shape[0] * 100
-missing_data = pd.concat([missing_data,missing_data_prec], axis=1)
-missing_data.columns =['occurence', 'precentage']
-print(missing_data)
-pd.reset_option('all')
-
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder
-def Labaling(data, categorical_cols):
-  for c in categorical_cols: 
-    lbl = LabelEncoder()
-    lbl.fit(list(data[c].values)) 
-    data[c] = lbl.transform(list(data[c].values))
-  return data
-
-house_df = Labaling(house_df, categorical_cols)
-print(categorical_cols)
-print("Categorial type features:")
-plt.figure(figsize=(30, 30))
-plt.subplots_adjust(hspace=0.5)
-for i, var in enumerate(categorical_cols):
-    plt.subplot(11,4,i+1)
-    fig = house_df[tr_idx][var].hist(bins=60)
-    fig.set_ylabel('number of houses')
-    fig.set_xlabel(var)
-    str3= "".join([var,' Histogram'])
-    fig.set_title(str3)
-
-# house_df missing features
-print("house_df missing features")
-print("house_df shape: {}".format(train.shape))
-pd.set_option('display.max_rows', None)
-missing_data = pd.DataFrame(house_df[categorical_cols].isna().sum())
-missing_data_prec = missing_data/house_df[categorical_cols].shape[0] * 100
-missing_data = pd.concat([missing_data,missing_data_prec], axis=1)
-missing_data.columns =['occurence', 'precentage']
-print(missing_data)
-pd.reset_option('all')
-
-"""### 2.1.3 One-hot encoding categorical features
-We apply One-Hot Encoding when:
-
-The categorical feature is not ordinal (like the countries above)
-The number of categorical features is less so one-hot encoding can be effectively applied
-We apply Label Encoding when:
-
-The categorical feature is ordinal (like Jr. kg, Sr. kg, Primary school, high school)
- The number of categories is quite large as one-hot encoding can lead to high memory consumption
-
-## 2.2 Dealing with Outliers
+## 2.1 Dealing with Outliers
 
 ***outlier:***  a data point that is distant from other similar points.should be excluded from the data set. We'll do a quick analysis through the standard deviation of 'SalePrice' and a set of scatter plots.
 """
 
+house_df[tr_idx]
+
+# int colums scatter plot
 plt.figure(figsize=(30, 30))
 plt.subplots_adjust(hspace=0.5)
 for i, var in enumerate(int_cols):
@@ -318,6 +228,7 @@ for i, var in enumerate(int_cols):
   fig.set_title(str3)
 plt.show()
 
+# float colums scatter plot
 plt.figure(figsize=(30, 30))
 plt.subplots_adjust(hspace=0.5)
 for i, var in enumerate(float_cols):
@@ -329,19 +240,32 @@ for i, var in enumerate(float_cols):
   fig.set_title(str3)
 plt.show()
 
+# Amit: We dosent need this when useing the 'remove_Outlier' function
+"""
 index = (house_df[tr_idx]['LotArea'] > 100000)
 index_list = list(house_df[tr_idx][index].index)
 print(index_list)
 house_df = house_df.drop(index_list)
 house_df
+"""
 
+# Amit: outdated function, use the currect one
+"""
 def remove_Outlier(data,tr_idx ,feature_name, value):
   index = (data[tr_idx][feature_name] > value)
   index_list = list(data[tr_idx][index].index)
   data = data.drop(index_list)
   return data
+  """
 
-"""### lets Analyze where the outliers are hidding:
+def remove_Outlier(data, feature_name, value):
+  idx = (data[feature_name] > value)
+  index_list = list(data[idx].index)
+  data = data.drop(index_list)
+  return data
+
+"""**lets Analyze where the outliers are hidding:**
+
 by observing the scatter praphs above we can notice the following ouliers data points:
 
 **For integer represented features**:
@@ -355,41 +279,38 @@ by observing the scatter praphs above we can notice the following ouliers data p
 7. MiscVal feature - over 8000
 8. EnclosedPorch feature - over 350
 
+# int cols
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "LotArea", 100000)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "1stFlrSF", 2500)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "2ndFlrSF", 1750)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "GrLivArea", 4000)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "WoodDeckSF", 700)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "PoolArea", 400)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "MiscVal", 8000)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "EnclosedPorch", 350)
+# float cols
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "MasVnrArea", 1200)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "BsmtFinSF1", 2000)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "BsmtFinSF2", 1200)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "TotalBsmtSF", 3000)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "GarageArea", 1100)
 
-
+# int cols
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "LotArea", 100000)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "1stFlrSF", 2500)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "2ndFlrSF", 1750)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "GrLivArea", 4000)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "WoodDeckSF", 700)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "PoolArea", 400)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "MiscVal", 8000)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "EnclosedPorch", 350)
+# float cols
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "MasVnrArea", 1200)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "BsmtFinSF1", 2000)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "BsmtFinSF2", 1200)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "TotalBsmtSF", 3000)
+house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "GarageArea", 1100)
 """
-
-# int cols
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "LotArea", 100000)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "1stFlrSF", 2500)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "2ndFlrSF", 1750)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "GrLivArea", 4000)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "WoodDeckSF", 700)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "PoolArea", 400)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "MiscVal", 8000)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "EnclosedPorch", 350)
-# float cols
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "MasVnrArea", 1200)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "BsmtFinSF1", 2000)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "BsmtFinSF2", 1200)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "TotalBsmtSF", 3000)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "GarageArea", 1100)
-
-# int cols
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "LotArea", 100000)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "1stFlrSF", 2500)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "2ndFlrSF", 1750)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "GrLivArea", 4000)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "WoodDeckSF", 700)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "PoolArea", 400)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "MiscVal", 8000)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "EnclosedPorch", 350)
-# float cols
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "MasVnrArea", 1200)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "BsmtFinSF1", 2000)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "BsmtFinSF2", 1200)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "TotalBsmtSF", 3000)
-house_df[tr_idx] = remove_Outlier(house_df[tr_idx], "GarageArea", 1100)
 
 plt.figure(figsize=(30, 10))
 plt.subplots_adjust(hspace=1)
@@ -459,16 +380,20 @@ for i, var in enumerate(float_Outliers):
   fig.set_title("After removing Outliers")
 plt.show()
 
-"""After applying the outliers removal severl times for different features, we notice that the most beneficial removal of outliers contain the following features as described in function: """
+"""When removing outliers according to the int colum, we notice that other outlier has been remove (according to other colums). The reasone behide it is that some samples conation multiple outliers according to different features. This is another reason to throw outlier samples.  
 
-def remove_Outlier(data, feature_name, value):
-  idx = (data[feature_name] > value)
-  index_list = list(data[idx].index)
-  data = data.drop(index_list)
-  return data
+After applying the outliers removal severl times for different features, we notice that the most beneficial removal of outliers contain the following features as described in function: 
+
+1. LotFrontage > 200
+2. BsmtFinSF1 > 2000
+3. 1stFlrSF > 2500
+4. TotalBsmtSF > 3000
+5. GrLivArea > 4000
+6. LotArea > 100000
+
+"""
 
 def Remove_all_ourliers(data):
-  ## int cols
   data = remove_Outlier(data, "LotFrontage", 200)
   data = remove_Outlier(data, "BsmtFinSF1", 2000)
   data = remove_Outlier(data, "1stFlrSF", 2500)
@@ -477,44 +402,50 @@ def Remove_all_ourliers(data):
   data = remove_Outlier(data, "LotArea", 100000)
   return data
 
-"""## 2.3 Taking care of skewed target
+# Creating new train, test and house_df after droping outliers samples
+train_rm_o = Remove_all_ourliers(train)
+test_rm_o = Remove_all_ourliers(test)
+house_df_rm_o = pd.concat([train_rm_o,test_rm_o],ignore_index = True, sort = False)
+tr_idx_rm = house_df_rm_o['SalePrice'].notnull() ## display data with on
+te_idx_rm = [not elem for elem in tr_idx]
+te_idx_rm = pd.Series(te_idx)
 
-The Sale price is a bit skewed, and for linear models its important that you normalize your data, so im going to log transform it
-"""
-
-plt.figure()
-sns.distplot(house_df['SalePrice']);
-house_df['SalePrice'] = np.log1p(house_df['SalePrice'])
-plt.title('Target SalePrice - skewed')
-plt.figure()
-sns.distplot(house_df['SalePrice'])
-plt.title('Log Transform Target SalePrice - unskewed')
-
-"""## 2.4 Missing Values
+"""## 2.2 Missing Values
 
 https://scikit-learn.org/stable/auto_examples/impute/plot_missing_values.html#sphx-glr-auto-examples-impute-plot-missing-values-py
 """
 
-X_train = house_df[tr_idx].drop(['SalePrice'], axis=1)
-X_test = house_df[te_idx]
-Y_train = house_df[tr_idx].SalePrice
-Y_test = house_df[te_idx].SalePrice
-overall_X = house_df.drop(['SalePrice'], axis=1)
+# train_rm_o
+# test_rm_o
+# house_df_rm_o
+# tr_idx_rm
+# te_idx_rm
+
+
+X_train = house_df_rm_o[tr_idx_rm].drop(['SalePrice'], axis=1)
+X_test = house_df_rm_o[te_idx_rm]
+Y_train = house_df_rm_o[tr_idx_rm].SalePrice
+Y_test = house_df_rm_o[te_idx_rm].SalePrice
+overall_X = house_df_rm_o
 print(X_train.shape)
 print(Y_train.shape)
 print(X_test.shape)
 print(Y_test.shape)
 print(overall_X.shape)
 
-"""### option 1 - get rid of the columns with the missing values
+len(categorical_cols)
 
-usually not the best solution. However, it can be useful when most values in a column are missing
+"""### 2.2.1 Drop columns with al lot of missing values
+
+Removing all the sample with missing values ssually isn't the best solution.  However, it can be useful when most values in a column are missing.
 """
 
-missing_data = [col for col in X_train.columns if (X_train[col].isnull().sum() / X_train.shape[0]) * 100 > 50]
 missing_data
-print('missing_data: {}'.format(missing_data))
-X_df_drop = overall_X.drop(missing_data, axis=1)
+
+missing_features = [col for col in X_train.columns if (X_train[col].isnull().sum() / X_train.shape[0]) * 100 > 50]
+missing_features
+print('missing_features: {}'.format(missing_features))
+X_df_drop = overall_X.drop(missing_features, axis=1)
 X_train_drop = X_df_drop[tr_idx]
 X_test_drop = X_df_drop[te_idx]
 
@@ -523,7 +454,18 @@ print('X_train_drop shape:  {}'.format(X_train_drop.shape))
 print('X_test_drop shape:   {}'.format(X_test_drop.shape))
 print(type(tr_idx))
 
-"""### option 2 - replacing with statistical value"""
+missing_features
+
+categorical_cols_1 = categorical_cols
+print(categorical_cols_1)
+for item in missing_features:
+  print(item)
+  categorical_cols_1.remove(item)
+categorical_cols_1
+
+len(categorical_cols)
+
+"""### 2.2.2 Categorical colums: replacing with statistical value"""
 
 X = X_df_drop
 pd.set_option('display.max_rows', None)
@@ -581,6 +523,17 @@ pd.reset_option('all')
 
 I = Impute_class(X=X)
 I.impute_values(cols=categorical_cols, method= "most_frequent")
+
+pd.set_option('display.max_rows', None)
+missing_data = pd.DataFrame(X.isna().sum())
+missing_data_prec = missing_data/X.shape[0] * 100
+missing_data = pd.concat([missing_data,missing_data_prec], axis=1)
+missing_data.columns =['occurence', 'precentage']
+print(missing_data)
+pd.reset_option('all')
+
+"""I = Impute_class(X=X)
+# I.impute_values(cols=categorical_cols, method= "most_frequent")
 I.impute_values(cols= int_cols, method= "median")
 I.impute_values(cols= float_cols, method= "KNN", K=10)
 X = I.X
@@ -593,7 +546,141 @@ missing_data.columns =['occurence', 'precentage']
 print(missing_data)
 pd.reset_option('all')
 
-"""##2.5 Normalize features
+## 2.3 Encoding categorical features
+"""
+
+# tr_idx_rm 
+# te_idx_rm 
+
+house_df_X = X
+train_X = house_df_X[tr_idx_rm]
+test_X = house_df_X[te_idx_rm]
+
+print("Categorial type features:")
+plt.figure(figsize=(30, 30))
+plt.subplots_adjust(hspace=0.5)
+for i, var in enumerate(categorical_cols):
+    plt.subplot(11,4,i+1)
+    fig = house_df_X[tr_idx_rm][var].hist(bins=60)
+    fig.set_ylabel('number of houses')
+    fig.set_xlabel(var)
+    str3= "".join([var,' Histogram'])
+    fig.set_title(str3)
+
+"""### 2.3.1 Factorizing categorical features"""
+
+def factorization(data, categorical_cols):
+  for c in categorical_cols:
+    data[c] = pd.factorize(data[c])[0]
+  return data
+
+house_df_fac = house_df_X
+house_df_fac = factorization(house_df_fac, categorical_cols)
+
+print("Categorial type features:")
+plt.figure(figsize=(30, 30))
+plt.subplots_adjust(hspace=0.5)
+for i, var in enumerate(categorical_cols):
+    plt.subplot(11,4,i+1)
+    fig = house_df_fac[tr_idx_rm][var].hist(bins=60)
+    fig.set_ylabel('number of houses')
+    fig.set_xlabel(var)
+    str3= "".join([var,' Histogram'])
+    fig.set_title(str3)
+
+"""Due to supiriorty of the lable incoding, we will not use this method.
+
+### 2.3.2 Label encoding categorical features
+
+Another option is using Label Encoding which refers to transforming the word labels into numerical form so that the algorithms can understand how to operate on them.
+"""
+
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+def Labaling(data, categorical_cols):
+  for c in categorical_cols: 
+    lbl = LabelEncoder()
+    lbl.fit(list(data[c].values)) 
+    data[c] = lbl.transform(list(data[c].values))
+  return data
+
+house_X_lab = Labaling(house_df_X, categorical_cols)
+print(categorical_cols)
+print("Categorial type features:")
+plt.figure(figsize=(30, 30))
+plt.subplots_adjust(hspace=0.5)
+for i, var in enumerate(categorical_cols):
+    plt.subplot(11,4,i+1)
+    fig = house_X_lab[tr_idx_rm][var].hist(bins=60)
+    fig.set_ylabel('number of houses')
+    fig.set_xlabel(var)
+    str3= "".join([var,' Histogram'])
+    fig.set_title(str3)
+
+"""### 2.3.3 One-hot encoding categorical features
+We apply One-Hot Encoding when:
+
+The categorical feature is not ordinal (like the countries above)
+The number of categorical features is less so one-hot encoding can be effectively applied
+We apply Label Encoding when:
+
+The categorical feature is ordinal (like Jr. kg, Sr. kg, Primary school, high school)
+ The number of categories is quite large as one-hot encoding can lead to high memory consumption
+
+## 2.4 Missing Values - int and float colums
+"""
+
+I = Impute_class(X=X)
+# I.impute_values(cols=categorical_cols, method= "most_frequent")
+I.impute_values(cols= int_cols, method= "median")
+I.impute_values(cols= float_cols, method= "KNN", K=10)
+X = I.X
+
+pd.set_option('display.max_rows', None)
+missing_data = pd.DataFrame(X.isna().sum())
+missing_data_prec = missing_data/X.shape[0] * 100
+missing_data = pd.concat([missing_data,missing_data_prec], axis=1)
+missing_data.columns =['occurence', 'precentage']
+print(missing_data)
+pd.reset_option('all')
+
+"""## 2.5 Taking care of skewed target
+
+The Sale price is a bit skewed, and for linear models its important that you normalize your data, so im going to log transform it
+"""
+
+# X_train = house_df_rm_o[tr_idx_rm].drop(['SalePrice'], axis=1)
+# X_test = house_df_rm_o[te_idx_rm]
+# Y_train = house_df_rm_o[tr_idx_rm].SalePrice
+# Y_test = house_df_rm_o[te_idx_rm].SalePrice
+
+house_df_X = X
+house_df_X
+train_X = house_df_X[tr_idx_rm]
+test_X = house_df_X[te_idx_rm]
+
+Y_price = house_df_rm_o[tr_idx_rm].SalePrice
+Y_price
+
+plt.figure()
+sns.distplot(Y_price);
+Y_price_log = np.log1p(Y_price)
+plt.title('Target SalePrice - skewed')
+plt.figure()
+sns.distplot(Y_price_log)
+plt.title('Log Transform Target SalePrice - unskewed')
+
+"""plt.figure()
+sns.distplot(house_df_X['SalePrice']);
+house_df_X['SalePrice'] = np.log1p(house_df_X['SalePrice'])
+plt.title('Target SalePrice - skewed')
+plt.figure()
+sns.distplot(house_df_X['SalePrice'])
+plt.title('Log Transform Target SalePrice - unskewed')
+
+train_X = house_df_X[tr_idx_rm]
+test_X = house_df_X[te_idx_rm]
+
+##2.6 Normalize features
 
 https://www.width.ai/pandas/normalize-column-pandas-dataframe
 
@@ -601,9 +688,17 @@ There is a problem here since all elements became float type - its sh
 """
 
 from scipy import stats
-X_train_imp_norm =  pd.DataFrame(stats.zscore(X))
-X_train_imp_norm.columns = X.columns
-X_train_imp_norm
+# X_train_imp_norm =  pd.DataFrame(stats.zscore(X))
+# X_train_imp_norm.columns = X.columns
+# X_train_imp_norm
+
+# house_df_X = X
+# house_df_X
+# train_X = house_df_X[tr_idx_rm]
+# test_X = house_df_X[te_idx_rm]
+
+# house_df_X_norm = pd.DataFrame(stats.zscore(house_df_X))
+# house_df_X_norm.columns = house_df_X.columns
 
 """from sklearn.cluster import KMeans
 kmeans = KMeans(3,init='k-means++')
@@ -644,7 +739,7 @@ def optimize_k(data, target):
     return errors
 k_errors = optimize_k(data=df, target='MEDV')
 
-## 2.6 Corrulations
+## 2.7 Corrulations
 
 Relationship between SalePrice and other numerical columns
 """
@@ -725,15 +820,20 @@ from sklearn.model_selection import train_test_split
 
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import cross_val_score
-print(X_train_imp_norm.shape)
+
+X = house_df_X.drop(['SalePrice'], axis=1)
+Y_train = Y_price_log
+X_train = X[tr_idx_rm]
+X_test = [te_idx_rm]
+
+
+print(X.shape)
 print(Y_train.shape)
-Xtrain, Xvalid, ytrain, yvalid = train_test_split(X_train_imp_norm[tr_idx], Y_train, test_size = 0.3, random_state = 0)
+Xtrain, Xvalid, ytrain, yvalid = train_test_split(X_train, Y_train, test_size = 0.3, random_state = 0)
 print("Xtrain : " + str(Xtrain.shape))
 print("Xtest : " + str(Xvalid.shape))
 print("ytrain : " + str(ytrain.shape))
 print("ytest : " + str(yvalid.shape))
-
-X_train_imp = X
 
 """https://www.bmc.com/blogs/mean-squared-error-r2-and-variance-in-regression-analysis/
 
@@ -820,9 +920,162 @@ plt.show()
 
 """Playing with the KNN imputation - will take onlr Ridge and Lasso regression
 
-### initialization function
+### 3.2.1 initialization function
 """
 
+# Amit initialize function
+import numpy as np
+import pandas as pd
+
+# param for later: impCat, impInt, impFloat, kCat = 10, kInt = 10, kFloat = 10
+def initialize_data():
+    train = pd.read_csv(main_path + '/train.csv')
+    test = pd.read_csv(main_path + '/test.csv')
+    
+    ## missing values - remove samples
+    train = Remove_all_ourliers(train)
+    test = Remove_all_ourliers(test)
+
+    # indexing
+    house_df = pd.concat([train,test],ignore_index = True, sort = False)
+    tr_idx = house_df['SalePrice'].notnull()
+    te_idx = [not elem for elem in tr_idx]
+    te_idx = pd.Series(te_idx)
+
+    X_train = house_df[tr_idx].drop(['SalePrice'], axis=1)
+    # X_test = house_df[te_idx].drop(['SalePrice'], axis=1)
+
+
+    ## missing features - remove features 
+    missing_features = [col for col in X_train.columns if (X_train[col].isnull().sum() / X_train.shape[0]) * 100 > 50]
+    X_df_drop = house_df.drop(missing_features, axis=1)
+
+    X_train_drop = X_df_drop[tr_idx]
+    X_test_drop = X_df_drop[te_idx]
+    Y_price = X_df_drop.SalePrice
+    
+    ## categorical missing features - impute features
+    categorical_cols = [cname for cname in X_df_drop.loc[:,:'SaleCondition'].columns if
+                    X_df_drop[cname].nunique() < 200 and 
+                    X_df_drop[cname].dtype == "object"]
+    
+    I = Impute_class(X=X_df_drop)
+    I.impute_values(cols=categorical_cols, method= "most_frequent")
+    X_df_impute = I.X
+
+    ## Categorical lable encoding
+    X_df_lable = Labaling(X_df_impute, categorical_cols)
+
+    ## int and float missing features - impute
+    I = Impute_class(X=X_df_lable)
+    I.impute_values(cols= int_cols, method= "median")
+    I.impute_values(cols= float_cols, method= "KNN", K=10)
+    X_df_impute2 = I.X
+
+    ## Taking care of skewed target
+    Y_price_log = np.log1p(Y_price)
+
+    # indexing
+    X_train = X_df_impute2[tr_idx].drop(['SalePrice'], axis=1)
+    Y_train = Y_price_log[tr_idx]
+    te_idx = [not elem for elem in tr_idx]
+    te_idx = pd.Series(te_idx)
+    X_test = np.log1p(Y_price)
+
+
+    # return X_train, Y_train, X_test, Y_test, categorical_cols, tr_idx, te_idx
+    return X_train, Y_train, X_test
+
+x_train, y_train, x_test = initialize_data()
+
+print(x_train.shape)
+print(y_train.shape)
+Xtrain, Xvalid, ytrain, yvalid = train_test_split(x_train, y_train, test_size = 0.3, random_state = 0)
+print("Xtrain : " + str(Xtrain.shape))
+print("Xtest : " + str(Xvalid.shape))
+print("ytrain : " + str(ytrain.shape))
+print("ytest : " + str(yvalid.shape))
+
+MAE_array_train = []
+MAE_array_valid = []
+R2_array_train = []
+R2_array_valid = []
+RMSE_array_train = []
+RMSE_array_valid = []
+
+R = Regression_model(Xtrain, ytrain)
+print("Linear Regression Model results:")
+R.Linear_reg()
+print("performences over Train set:")
+Score = R.score_dataset(Xtrain, ytrain)
+MAE_array_train.append(Score[0])
+R2_array_train.append(Score[1])
+RMSE_array_train.append(Score[2])
+print("\n")
+
+print("performences over Validation set:")
+Score = R.score_dataset(Xvalid, yvalid)
+MAE_array_valid.append(Score[0])
+R2_array_valid.append(Score[1])
+RMSE_array_valid.append(Score[2])
+print("\n")
+
+print("Lasso Regression Model results:")
+R.Lasso_reg([1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100])
+print("performences over Train set:")
+Score = R.score_dataset(Xtrain, ytrain)
+MAE_array_train.append(Score[0])
+R2_array_train.append(Score[1])
+RMSE_array_train.append(Score[2])
+print("\n")
+
+print("performences over Validation set:")
+Score = R.score_dataset(Xvalid, yvalid)
+MAE_array_valid.append(Score[0])
+R2_array_valid.append(Score[1])
+RMSE_array_valid.append(Score[2])
+print("\n")
+
+# print("Kernal Ridge Regression Model results:")
+# K_reg = R.KernelRidge_reg(10)
+# print("performences over Train set:")
+# R.score_dataset(Xtrain, ytrain)
+# print("\n")
+# print("performences over Validation set:")
+# R.score_dataset(Xvalid, yvalid)
+# print("\n")
+
+R.RidgeKfold_reg([1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100])
+print("Ridge Kfold Regression Model results:")
+print("performences over Train set:")
+Score = R.score_dataset(Xtrain, ytrain)
+MAE_array_train.append(Score[0])
+R2_array_train.append(Score[1])
+RMSE_array_train.append(Score[2])
+print("\n")
+
+print("performences over Validation set:")
+Score = R.score_dataset(Xvalid, yvalid)
+MAE_array_valid.append(Score[0])
+R2_array_valid.append(Score[1])
+RMSE_array_valid.append(Score[2])
+print("\n")
+
+fig, axs = plt.subplots(1, 3, figsize=(18, 6), sharey=False)
+axs[0].scatter(["Linear", "Lasso", "Ridge"], MAE_array_valid)
+axs[1].scatter(["Linear", "Lasso", "Ridge"], R2_array_valid)
+axs[2].scatter(["Linear", "Lasso", "Ridge"], RMSE_array_valid)
+axs[0].set_ylabel("MAE")
+axs[1].set_ylabel("R2")
+axs[2].set_ylabel("RMSE")
+axs[0].set_xlabel("Regression method")
+axs[1].set_xlabel("Regression method")
+axs[2].set_xlabel("Regression method")
+fig.suptitle('Regression methods Performences')
+plt.show()
+
+# Dor initialize function
+"""
 import numpy as np
 import pandas as pd
 def initialize_data():
@@ -863,6 +1116,56 @@ def initialize_data():
     Y_test = house_df[te_idx].SalePrice
     
     return X_train, Y_train, X_test, Y_test, categorical_cols, tr_idx, te_idx
+"""
+
+"""### ++++++++++"""
+
+fig, axs = plt.subplots(1, 3, figsize=(18, 6), sharey=False)
+for K_it in np.linspace(2,50,25, dtype= int):
+  # X, Y_train, X_test, Y_test = initialize_data("most_frequent", "KNN", "KNN",K_it, K_it, K_it)
+  X_1, Y_train, X_test, Y_test = initialize_data(impCat = "most_frequent", impInt = "KNN", impFloat = "KNN", Kcat = K_it, Kint = K_it, Kfloat = K_it)
+  # I = Impute_class(X)
+  # I.impute_values(cols=categorical_cols, method= "KNN",K=K_it)
+  # I.impute_values(cols=int_cols, method= "KNN",K=K_it)
+  # I.impute_values(cols=float_cols, method= "KNN",K=K_it)
+  # X = I.X
+  # # normalize features
+  # X_norm =  pd.DataFrame(stats.zscore(X_1))
+  # X_norm.columns = X_1.columns
+
+  Xtrain, Xvalid, ytrain, yvalid = train_test_split(X_1, Y_train, test_size = 0.3, random_state = 0)
+  R = Regression_model(Xtrain, ytrain)
+  MAE_array_train = []
+  MAE_array_valid = []
+  R2_array_train = []
+  R2_array_valid = []
+  RMSE_array_train = []
+  RMSE_array_valid = []
+  print("K = {}".format(K_it))
+  R.Lasso_reg([1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100])
+  Score = R.score_dataset(Xvalid, yvalid)
+  MAE_array_valid.append(Score[0])
+  R2_array_valid.append(Score[1])
+  RMSE_array_valid.append(Score[2])
+
+  R.RidgeKfold_reg([1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100])
+  Score = R.score_dataset(Xvalid, yvalid)
+  MAE_array_valid.append(Score[0])
+  R2_array_valid.append(Score[1])
+  RMSE_array_valid.append(Score[2])
+
+  axs[0].scatter(["Lasso", "Ridge"], MAE_array_valid, label ="K ={}".format(K_it))
+  axs[1].scatter(["Lasso", "Ridge"], R2_array_valid, label ="K ={}".format(K_it))
+  axs[2].scatter(["Lasso", "Ridge"], RMSE_array_valid, label ="K ={}".format(K_it))
+axs[0].set_ylabel("MAE")
+axs[1].set_ylabel("R2")
+axs[2].set_ylabel("RMSE")
+axs[0].set_xlabel("Regression method")
+axs[1].set_xlabel("Regression method")
+axs[2].set_xlabel("Regression method")
+fig.suptitle('Regression methods Performences')
+plt.legend()
+plt.show()
 
 fig, axs = plt.subplots(1, 3, figsize=(18, 6), sharey=False)
 for K_it in np.linspace(2,50,25, dtype= int):
@@ -1165,7 +1468,7 @@ RMSE = 0.17591184162060375
 
 house_df.iloc[705]
 
-"""### 3.2.1 Label Encoding vs Factorization """
+"""### 3.2.2 Label Encoding vs Factorization """
 
 # Using Label Encoding in order to mess with Categorical Values
 fig, axs = plt.subplots(1, 3, figsize=(18, 6), sharey=False)
