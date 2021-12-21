@@ -410,17 +410,12 @@ tr_idx_rm = house_df_rm_o['SalePrice'].notnull() ## display data with on
 te_idx_rm = [not elem for elem in tr_idx]
 te_idx_rm = pd.Series(te_idx)
 
-"""## 2.2 Missing Values
+"""## 2.2 Feature removal
+
+In the database, there are features that missing from samples, we need to treat them correcty. Dropping all the feature with missing values usally not recommended. However, it is ok if most of ths values of the feature are missing. In this section we remove all the feature that most of its values are missing
 
 https://scikit-learn.org/stable/auto_examples/impute/plot_missing_values.html#sphx-glr-auto-examples-impute-plot-missing-values-py
 """
-
-# train_rm_o
-# test_rm_o
-# house_df_rm_o
-# tr_idx_rm
-# te_idx_rm
-
 
 X_train = house_df_rm_o[tr_idx_rm].drop(['SalePrice'], axis=1)
 X_test = house_df_rm_o[te_idx_rm]
@@ -433,19 +428,65 @@ print(X_test.shape)
 print(Y_test.shape)
 print(overall_X.shape)
 
-len(categorical_cols)
-
-"""### 2.2.1 Drop columns with al lot of missing values
-
-Removing all the sample with missing values ssually isn't the best solution.  However, it can be useful when most values in a column are missing.
+"""**correlation**:
+Relationship between SalePrice and other numerical columns
 """
 
-missing_data
+# correlation matrix
+corrmat = train.corr()
+# f, ax = plt.subplots(figsize=(25, 25))
+# # sns.heatmap(corrmat, vmax=.8, square=True);
+# hm = sns.heatmap(corrmat, cbar=True, annot=True, square=True, fmt='.2f', annot_kws={'size': 10})
+# plt.show()
 
-missing_features = [col for col in X_train.columns if (X_train[col].isnull().sum() / X_train.shape[0]) * 100 > 50]
-missing_features
-print('missing_features: {}'.format(missing_features))
-X_df_drop = overall_X.drop(missing_features, axis=1)
+k = 10 #number of variables for heatmap
+cols = corrmat.nlargest(k, 'SalePrice')['SalePrice'].index
+cm = np.corrcoef(train[cols].values.T)
+sns.set(font_scale=1.25)
+hm = sns.heatmap(cm, cbar=True, annot=True, square=True, fmt='.2f', annot_kws={'size': 10}, yticklabels=cols.values, xticklabels=cols.values)
+plt.show()
+
+"""Most correlated variables according to the dataset description:
+
+
+* **OverallQual** = Rates the overall material and finish of the house
+* **GrLivArea** = Above grade (ground) living area square feet
+* **TotalBsmtSF** = Total square feet of basement area
+* **GarageCars** = Size of garage in car capacity
+* **GarageArea** = Size of garage in square feet
+* **TotalBsmtSF** = Total square feet of basement area
+* **1stFlrSF** = First Floor square feet
+* **FullBath** = Full bathrooms above grade
+* **TotRmsAbvGrd** = Total rooms above grade (does not include bathrooms)
+* **YearBuilt** = Original construction date
+
+Having the variables with the most correlation with Saleprice we can make the following conlusions:
+
+* **GarageCars** and **GarageArea** are basically the same, de amount of cars will vary on the total size are of the garage, so we can select one of these columns for and drop the other one.
+* **TotalBsmtSF** and **1stFlrSF** also looks very similar, we will keep **TotalBsmtSF**
+YearBuilt it is wierd how the correlation shows the contruction year not so correlated to the salePrice, some reasons could be the fact that olds hourses might be renovated or located in better areas.
+
+So, now we can implement feature removal according to 3 factors:
+
+1. **missing_features**: represent the features where most of them missing 
+
+2. **irellvent_features**: represent feature without correlatiuon to the SalePrice
+
+3. **corr_features**: features with high correlation between them
+"""
+
+def featureDrop(data, tr_idx, ifPrint=False):
+  missing_features = [col for col in data[tr_idx].columns if (data[tr_idx][col].isnull().sum() / data[tr_idx].shape[0]) * 100 > 50]
+  irellvent_features = ['Id']
+  # corr_features = ['GarageArea', '1stFlrSF']
+  drop_features = missing_features + irellvent_features
+  data_drop = data.drop(drop_features, axis=1)
+  if ifPrint:
+    print('missing_features: {}'.format(missing_features))
+    print('irellvent_features: {}'.format(irellvent_features))
+  return data_drop
+
+X_df_drop = featureDrop(overall_X, tr_idx, ifPrint=True)
 X_train_drop = X_df_drop[tr_idx]
 X_test_drop = X_df_drop[te_idx]
 
@@ -454,20 +495,120 @@ print('X_train_drop shape:  {}'.format(X_train_drop.shape))
 print('X_test_drop shape:   {}'.format(X_test_drop.shape))
 print(type(tr_idx))
 
-missing_features
+"""Because we removed fetures, the cloums changed:"""
 
-categorical_cols_1 = categorical_cols
-print(categorical_cols_1)
-for item in missing_features:
-  print(item)
-  categorical_cols_1.remove(item)
-categorical_cols_1
+# Select categorical columns
+categorical_cols = [cname for cname in X_df_drop.loc[:,:'SaleCondition'].columns if
+                    X_df_drop[cname].nunique() < 200 and 
+                    X_df_drop[cname].dtype == "object"]
 
-len(categorical_cols)
+print("Number of Categorical fetures:",(len(categorical_cols)))
+# Select numerical columns
+int_cols = [cname for cname in X_df_drop.loc[:,:'SaleCondition'].columns if 
+                X_df_drop[cname].dtype in ['int64']]
+    
+print("Number of integer fetures:",(len(int_cols)))
 
-"""### 2.2.2 Categorical colums: replacing with statistical value"""
+float_cols = [cname for cname in X_df_drop.loc[:,:'SaleCondition'].columns if 
+                X_df_drop[cname].dtype in ['float64']]
+print("Number of float fetures:",(len(float_cols)))
 
-X = X_df_drop
+"""## 2.3 Encoding categorical features
+
+#### 2.3.1 Label encoding categorical features
+
+Another option is using Label Encoding which refers to transforming the word labels into numerical form so that the algorithms can understand how to operate on them.
+
+pd.set_option('display.max_rows', None)
+missing_data = pd.DataFrame(X_df_drop.isna().sum())
+missing_data_prec = missing_data/X_df_drop.shape[0] * 100
+missing_data = pd.concat([missing_data,missing_data_prec], axis=1)
+missing_data.columns =['occurence', 'precentage']
+print(missing_data)
+pd.reset_option('all')
+"""
+
+# scatter plot: Categorial type features
+print("Categorial type features:")
+plt.figure(figsize=(30, 30))
+plt.subplots_adjust(hspace=0.5)
+for i, var in enumerate(categorical_cols):
+    plt.subplot(11,4,i+1)
+    fig = X_df_drop[var].hist(bins=60)
+    fig.set_ylabel('number of houses')
+    fig.set_xlabel(var)
+    str3= "".join([var,' Histogram'])
+    fig.set_title(str3)
+
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+
+
+def Labaling_V2(data):
+  df = data
+  df = df.apply(lambda series: pd.Series(
+      LabelEncoder().fit_transform(series[series.notnull()]),
+      index=series[series.notnull()].index))
+  return df
+
+  
+house_df_lab = Labaling_V2(X_df_drop)
+
+print("Categorial type features:")
+plt.figure(figsize=(30, 30))
+plt.subplots_adjust(hspace=0.5)
+for i, var in enumerate(categorical_cols):
+    plt.subplot(11,4,i+1)
+    fig = house_df_lab[var].hist(bins=60)
+    fig.set_ylabel('number of houses')
+    fig.set_xlabel(var)
+    str3= "".join([var,' Histogram'])
+    fig.set_title(str3)
+
+"""#### 2.3.2 Factorizing categorical features"""
+
+def factorization(data, categorical_cols):
+  for c in categorical_cols:
+    data[c] = pd.factorize(data[c])[0]
+  return data
+
+house_df_fac = X_df_drop
+house_df_fac = factorization(house_df_fac, categorical_cols)
+
+print("Categorial type features:")
+plt.figure(figsize=(30, 30))
+plt.subplots_adjust(hspace=0.5)
+for i, var in enumerate(categorical_cols):
+    plt.subplot(11,4,i+1)
+    fig = X_df_drop[var].hist(bins=60)
+    fig.set_ylabel('number of houses')
+    fig.set_xlabel(var)
+    str3= "".join([var,' Histogram'])
+    fig.set_title(str3)
+
+"""#### 2.3.3 One-hot encoding categorical features
+We apply One-Hot Encoding when:
+
+The categorical feature is not ordinal (like the countries above)
+The number of categorical features is less so one-hot encoding can be effectively applied
+We apply Label Encoding when:
+
+The categorical feature is ordinal (like Jr. kg, Sr. kg, Primary school, high school)
+ The number of categories is quite large as one-hot encoding can lead to high memory consumption
+
+pd.set_option('display.max_rows', None)
+missing_data = pd.DataFrame(df.isna().sum())
+missing_data_prec = missing_data/df.shape[0] * 100
+missing_data = pd.concat([missing_data,missing_data_prec], axis=1)
+missing_data.columns =['occurence', 'precentage']
+print(missing_data)
+pd.reset_option('all')
+
+## 2.4 Replacing missing values
+
+### 2.4.1 Categorical colums: replacing with statistical value
+"""
+
+X = house_df_lab
 pd.set_option('display.max_rows', None)
 missing_data = pd.DataFrame(X.isna().sum())
 missing_data_prec = missing_data/X.shape[0] * 100
@@ -512,17 +653,9 @@ class Impute_class(object):
       
     return imputer
 
-X = X_df_drop
-pd.set_option('display.max_rows', None)
-missing_data = pd.DataFrame(X.isna().sum())
-missing_data_prec = missing_data/X.shape[0] * 100
-missing_data = pd.concat([missing_data,missing_data_prec], axis=1)
-missing_data.columns =['occurence', 'precentage']
-print(missing_data)
-pd.reset_option('all')
-
-I = Impute_class(X=X)
-I.impute_values(cols=categorical_cols, method= "most_frequent")
+I = Impute_class(X=house_df_lab)
+I.impute_values(cols=categorical_cols, method= "median")
+X = I.X
 
 pd.set_option('display.max_rows', None)
 missing_data = pd.DataFrame(X.isna().sum())
@@ -546,87 +679,7 @@ missing_data.columns =['occurence', 'precentage']
 print(missing_data)
 pd.reset_option('all')
 
-## 2.3 Encoding categorical features
-"""
-
-# tr_idx_rm 
-# te_idx_rm 
-
-house_df_X = X
-train_X = house_df_X[tr_idx_rm]
-test_X = house_df_X[te_idx_rm]
-
-print("Categorial type features:")
-plt.figure(figsize=(30, 30))
-plt.subplots_adjust(hspace=0.5)
-for i, var in enumerate(categorical_cols):
-    plt.subplot(11,4,i+1)
-    fig = house_df_X[tr_idx_rm][var].hist(bins=60)
-    fig.set_ylabel('number of houses')
-    fig.set_xlabel(var)
-    str3= "".join([var,' Histogram'])
-    fig.set_title(str3)
-
-"""### 2.3.1 Factorizing categorical features"""
-
-def factorization(data, categorical_cols):
-  for c in categorical_cols:
-    data[c] = pd.factorize(data[c])[0]
-  return data
-
-house_df_fac = house_df_X
-house_df_fac = factorization(house_df_fac, categorical_cols)
-
-print("Categorial type features:")
-plt.figure(figsize=(30, 30))
-plt.subplots_adjust(hspace=0.5)
-for i, var in enumerate(categorical_cols):
-    plt.subplot(11,4,i+1)
-    fig = house_df_fac[tr_idx_rm][var].hist(bins=60)
-    fig.set_ylabel('number of houses')
-    fig.set_xlabel(var)
-    str3= "".join([var,' Histogram'])
-    fig.set_title(str3)
-
-"""Due to supiriorty of the lable incoding, we will not use this method.
-
-### 2.3.2 Label encoding categorical features
-
-Another option is using Label Encoding which refers to transforming the word labels into numerical form so that the algorithms can understand how to operate on them.
-"""
-
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder
-def Labaling(data, categorical_cols):
-  for c in categorical_cols: 
-    lbl = LabelEncoder()
-    lbl.fit(list(data[c].values)) 
-    data[c] = lbl.transform(list(data[c].values))
-  return data
-
-house_X_lab = Labaling(house_df_X, categorical_cols)
-print(categorical_cols)
-print("Categorial type features:")
-plt.figure(figsize=(30, 30))
-plt.subplots_adjust(hspace=0.5)
-for i, var in enumerate(categorical_cols):
-    plt.subplot(11,4,i+1)
-    fig = house_X_lab[tr_idx_rm][var].hist(bins=60)
-    fig.set_ylabel('number of houses')
-    fig.set_xlabel(var)
-    str3= "".join([var,' Histogram'])
-    fig.set_title(str3)
-
-"""### 2.3.3 One-hot encoding categorical features
-We apply One-Hot Encoding when:
-
-The categorical feature is not ordinal (like the countries above)
-The number of categorical features is less so one-hot encoding can be effectively applied
-We apply Label Encoding when:
-
-The categorical feature is ordinal (like Jr. kg, Sr. kg, Primary school, high school)
- The number of categories is quite large as one-hot encoding can lead to high memory consumption
-
-## 2.4 Missing Values - int and float colums
+### 2.4.2 Missing Values - int and float colums
 """
 
 I = Impute_class(X=X)
@@ -648,11 +701,6 @@ pd.reset_option('all')
 The Sale price is a bit skewed, and for linear models its important that you normalize your data, so im going to log transform it
 """
 
-# X_train = house_df_rm_o[tr_idx_rm].drop(['SalePrice'], axis=1)
-# X_test = house_df_rm_o[te_idx_rm]
-# Y_train = house_df_rm_o[tr_idx_rm].SalePrice
-# Y_test = house_df_rm_o[te_idx_rm].SalePrice
-
 house_df_X = X
 house_df_X
 train_X = house_df_X[tr_idx_rm]
@@ -669,18 +717,7 @@ plt.figure()
 sns.distplot(Y_price_log)
 plt.title('Log Transform Target SalePrice - unskewed')
 
-"""plt.figure()
-sns.distplot(house_df_X['SalePrice']);
-house_df_X['SalePrice'] = np.log1p(house_df_X['SalePrice'])
-plt.title('Target SalePrice - skewed')
-plt.figure()
-sns.distplot(house_df_X['SalePrice'])
-plt.title('Log Transform Target SalePrice - unskewed')
-
-train_X = house_df_X[tr_idx_rm]
-test_X = house_df_X[te_idx_rm]
-
-##2.6 Normalize features
+"""##2.6 Normalize features
 
 https://www.width.ai/pandas/normalize-column-pandas-dataframe
 
@@ -688,70 +725,12 @@ There is a problem here since all elements became float type - its sh
 """
 
 from scipy import stats
-# X_train_imp_norm =  pd.DataFrame(stats.zscore(X))
-# X_train_imp_norm.columns = X.columns
-# X_train_imp_norm
-
-# house_df_X = X
-# house_df_X
-# train_X = house_df_X[tr_idx_rm]
-# test_X = house_df_X[te_idx_rm]
-
-# house_df_X_norm = pd.DataFrame(stats.zscore(house_df_X))
-# house_df_X_norm.columns = house_df_X.columns
-
-"""from sklearn.cluster import KMeans
-kmeans = KMeans(3,init='k-means++')
-kmeans.fit(df_preprocessed.drop('species',axis=1))
-wcss=[]
-for i in range(1,10):
-    kmeans = KMeans(i)
-    kmeans.fit(df_preprocessed.drop('species',axis=1))
-    pred_i = kmeans.labels_
-    wcss.append(kmeans.inertia_)
-
-plt.figure(figsize=(10,6))
-plt.plot(range(1,10),wcss)
-plt.ylim([0,1800])
-plt.title('The Elbow Method',{'fontsize':20})
-plt.xlabel('Number of clusters')
-plt.ylabel('Within-cluster Sum of Squares');
-
-new_X_train
-
-def optimize_k(data, target):
-    errors = []
-    for k in range(1, 20, 2):
-        imputer = KNNImputer(n_neighbors=k)
-        imputed = imputer.fit_transform(data)
-        df_imputed = pd.DataFrame(imputed, columns=df.columns)
-        
-        X = df_imputed.drop(target, axis=1)
-        y = df_imputed[target]
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-        model = RandomForestRegressor()
-        model.fit(X_train, y_train)
-        preds = model.predict(X_test)
-        error = rmse(y_test, preds)
-        errors.append({'K': k, 'RMSE': error})
-        
-    return errors
-k_errors = optimize_k(data=df, target='MEDV')
-
-## 2.7 Corrulations
-
-Relationship between SalePrice and other numerical columns
-"""
-
-#correlation matrix
-corrmat = train.corr()
-f, ax = plt.subplots(figsize=(16, 14))
-sns.heatmap(corrmat, vmax=.8, square=True);
+house_df_X_norm = pd.DataFrame(stats.zscore(house_df_X))
+house_df_X_norm.columns = house_df_X.columns
 
 """# Section 3: Implement prediction models
 
-## 3.1 Model implemention
+## 3.1 Model implemention and evaluation
 """
 
 from sklearn.linear_model import LinearRegression
@@ -797,26 +776,111 @@ class Regression_model(object):
         self.model = PolynomialFeatures(interaction_only=True)
         self.model.fit(self.X, self.Y)
 
-    def score_dataset(self, X_test, y_test):
+    def score_dataset(self, X_test, y_test, ifPrint=True):
         preds = self.model.predict(X_test)
         MAE = mean_absolute_error(y_test, preds)
         R2 = r2_score(y_test,y_pred=preds)
         RMSE = np.sqrt(mean_squared_error(y_test,y_pred=preds))
         # Score = self.model.score(X_test, y_test)
-        print("MAE = {}".format(MAE))
-        print("R2 = {}".format(R2))
-        print("RMSE = {}".format(RMSE))
+        if ifPrint:
+          print("MAE = {}".format(MAE))
+          print("R2 = {}".format(R2))
+          print("RMSE = {}".format(RMSE))
         # print("Score = {}".format(Score))
         return MAE, R2, RMSE
 
-"""## 3.2 Data Split
+def evaluate_model(data_train, data_valid, target_train, target_valid, ifPrint=True):
+  MAE_array_train = []
+  MAE_array_valid = []
+  R2_array_train = []
+  R2_array_valid = []
+  RMSE_array_train = []
+  RMSE_array_valid = []
+
+
+  if ifPrint: print("Linear Regression Model results:")
+  R = Regression_model(Xtrain, ytrain)
+  R.Linear_reg()
+  if ifPrint: print("performences over Train set:")
+  Score = R.score_dataset(Xtrain, ytrain, ifPrint)
+  MAE_array_train.append(Score[0])
+  R2_array_train.append(Score[1])
+  RMSE_array_train.append(Score[2])
+  
+  
+  if ifPrint: print("\n")
+
+  if ifPrint: print("performences over Validation set:")
+  Score = R.score_dataset(Xvalid, yvalid, ifPrint)
+  MAE_array_valid.append(Score[0])
+  R2_array_valid.append(Score[1])
+  RMSE_array_valid.append(Score[2])
+  if ifPrint: print("\n")
+
+  if ifPrint: print("Lasso Regression Model results:")
+  R.Lasso_reg([1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100])
+  if ifPrint: print("performences over Train set:")
+  Score = R.score_dataset(Xtrain, ytrain, ifPrint)
+  MAE_array_train.append(Score[0])
+  R2_array_train.append(Score[1])
+  RMSE_array_train.append(Score[2])
+  if ifPrint: print("\n")
+
+  if ifPrint: print("performences over Validation set:")
+  Score = R.score_dataset(Xvalid, yvalid, ifPrint)
+  MAE_array_valid.append(Score[0])
+  R2_array_valid.append(Score[1])
+  RMSE_array_valid.append(Score[2])
+  if ifPrint: print("\n")
+
+  # print("Kernal Ridge Regression Model results:")
+  # K_reg = R.KernelRidge_reg(10)
+  # print("performences over Train set:")
+  # R.score_dataset(Xtrain, ytrain)
+  # print("\n")
+  # print("performences over Validation set:")
+  # R.score_dataset(Xvalid, yvalid)
+  # print("\n")
+
+  R.RidgeKfold_reg([1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100])
+  if ifPrint: print("Ridge Kfold Regression Model results:")
+  if ifPrint: print("performences over Train set:")
+  Score = R.score_dataset(Xtrain, ytrain, ifPrint)
+  MAE_array_train.append(Score[0])
+  R2_array_train.append(Score[1])
+  RMSE_array_train.append(Score[2])
+  if ifPrint: print("\n")
+
+  if ifPrint: print("performences over Validation set:")
+  Score = R.score_dataset(Xvalid, yvalid, ifPrint)
+  MAE_array_valid.append(Score[0])
+  R2_array_valid.append(Score[1])
+  RMSE_array_valid.append(Score[2])
+  if ifPrint: print("\n")
+
+  if ifPrint:
+    fig, axs = plt.subplots(1, 3, figsize=(18, 6), sharey=False)
+    axs[0].scatter(["Linear", "Lasso", "Ridge"], MAE_array_valid)
+    axs[1].scatter(["Linear", "Lasso", "Ridge"], R2_array_valid)
+    axs[2].scatter(["Linear", "Lasso", "Ridge"], RMSE_array_valid)
+    axs[0].set_ylabel("MAE")
+    axs[1].set_ylabel("R2")
+    axs[2].set_ylabel("RMSE")
+    axs[0].set_xlabel("Regression method")
+    axs[1].set_xlabel("Regression method")
+    axs[2].set_xlabel("Regression method")
+    fig.suptitle('Regression methods validation Performences')
+    plt.show()
+  return MAE_array_valid, R2_array_valid, RMSE_array_valid
+
+"""## 3.2 Test current model
+
+### 3.2.1 Data Split
 
 Splitting the original train data into train and validation 
 
 consider use k-fold
 """
-
-from sklearn.model_selection import train_test_split
 
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import cross_val_score
@@ -837,104 +901,31 @@ print("ytest : " + str(yvalid.shape))
 
 """https://www.bmc.com/blogs/mean-squared-error-r2-and-variance-in-regression-analysis/
 
-## 3.2 Evaluate models
+### 3.2.2 Evaluate models
 """
 
-MAE_array_train = []
-MAE_array_valid = []
-R2_array_train = []
-R2_array_valid = []
-RMSE_array_train = []
-RMSE_array_valid = []
-
-R = Regression_model(Xtrain, ytrain)
-print("Linear Regression Model results:")
-R.Linear_reg()
-print("performences over Train set:")
-Score = R.score_dataset(Xtrain, ytrain)
-MAE_array_train.append(Score[0])
-R2_array_train.append(Score[1])
-RMSE_array_train.append(Score[2])
-print("\n")
-
-print("performences over Validation set:")
-Score = R.score_dataset(Xvalid, yvalid)
-MAE_array_valid.append(Score[0])
-R2_array_valid.append(Score[1])
-RMSE_array_valid.append(Score[2])
-print("\n")
-
-print("Lasso Regression Model results:")
-R.Lasso_reg([1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100])
-print("performences over Train set:")
-Score = R.score_dataset(Xtrain, ytrain)
-MAE_array_train.append(Score[0])
-R2_array_train.append(Score[1])
-RMSE_array_train.append(Score[2])
-print("\n")
-
-print("performences over Validation set:")
-Score = R.score_dataset(Xvalid, yvalid)
-MAE_array_valid.append(Score[0])
-R2_array_valid.append(Score[1])
-RMSE_array_valid.append(Score[2])
-print("\n")
-
-# print("Kernal Ridge Regression Model results:")
-# K_reg = R.KernelRidge_reg(10)
-# print("performences over Train set:")
-# R.score_dataset(Xtrain, ytrain)
-# print("\n")
-# print("performences over Validation set:")
-# R.score_dataset(Xvalid, yvalid)
-# print("\n")
-
-R.RidgeKfold_reg([1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100])
-print("Ridge Kfold Regression Model results:")
-print("performences over Train set:")
-Score = R.score_dataset(Xtrain, ytrain)
-MAE_array_train.append(Score[0])
-R2_array_train.append(Score[1])
-RMSE_array_train.append(Score[2])
-print("\n")
-
-print("performences over Validation set:")
-Score = R.score_dataset(Xvalid, yvalid)
-MAE_array_valid.append(Score[0])
-R2_array_valid.append(Score[1])
-RMSE_array_valid.append(Score[2])
-print("\n")
-
-fig, axs = plt.subplots(1, 3, figsize=(18, 6), sharey=False)
-axs[0].scatter(["Linear", "Lasso", "Ridge"], MAE_array_valid)
-axs[1].scatter(["Linear", "Lasso", "Ridge"], R2_array_valid)
-axs[2].scatter(["Linear", "Lasso", "Ridge"], RMSE_array_valid)
-axs[0].set_ylabel("MAE")
-axs[1].set_ylabel("R2")
-axs[2].set_ylabel("RMSE")
-axs[0].set_xlabel("Regression method")
-axs[1].set_xlabel("Regression method")
-axs[2].set_xlabel("Regression method")
-fig.suptitle('Regression methods Performences')
-plt.show()
+evaluate_model(data_train=Xtrain, data_valid=Xvalid, target_train=ytrain, target_valid=yvalid, ifPrint=True)
 
 """Playing with the KNN imputation - will take onlr Ridge and Lasso regression
 
-### 3.2.1 initialization function
+## 3.3 initialization function
+
+Now, we will generelize all the Feature engineering we implemented to 'initialize_data' function in order to test different hyperparameters
 """
 
 # Amit initialize function
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 # param for later: impCat, impInt, impFloat, kCat = 10, kInt = 10, kFloat = 10
-def initialize_data():
+def initialize_data(impCat, impInt, impFloat, catEnc = 'Label'):
     train = pd.read_csv(main_path + '/train.csv')
     test = pd.read_csv(main_path + '/test.csv')
     
     ## missing values - remove samples
     train = Remove_all_ourliers(train)
-    test = Remove_all_ourliers(test)
+    # test = Remove_all_ourliers(test)
 
     # indexing
     house_df = pd.concat([train,test],ignore_index = True, sort = False)
@@ -947,124 +938,102 @@ def initialize_data():
 
 
     ## missing features - remove features 
-    missing_features = [col for col in X_train.columns if (X_train[col].isnull().sum() / X_train.shape[0]) * 100 > 50]
-    X_df_drop = house_df.drop(missing_features, axis=1)
-
+    X_df_drop = featureDrop(house_df, tr_idx, ifPrint=False)
     X_train_drop = X_df_drop[tr_idx]
     X_test_drop = X_df_drop[te_idx]
     Y_price = X_df_drop.SalePrice
-    
-    ## categorical missing features - impute features
+
+    #colums
     categorical_cols = [cname for cname in X_df_drop.loc[:,:'SaleCondition'].columns if
-                    X_df_drop[cname].nunique() < 200 and 
-                    X_df_drop[cname].dtype == "object"]
-    
-    I = Impute_class(X=X_df_drop)
-    I.impute_values(cols=categorical_cols, method= "most_frequent")
-    X_df_impute = I.X
+                X_df_drop[cname].nunique() < 200 and 
+                X_df_drop[cname].dtype == "object"]
 
-    ## Categorical lable encoding
-    X_df_lable = Labaling(X_df_impute, categorical_cols)
+    int_cols = [cname for cname in X_df_drop.loc[:,:'SaleCondition'].columns if 
+                    X_df_drop[cname].dtype in ['int64']]
 
-    ## int and float missing features - impute
-    I = Impute_class(X=X_df_lable)
-    I.impute_values(cols= int_cols, method= "median")
-    I.impute_values(cols= float_cols, method= "KNN", K=10)
+    float_cols = [cname for cname in X_df_drop.loc[:,:'SaleCondition'].columns if 
+                    X_df_drop[cname].dtype in ['float64']]
+
+    ## Categorical encoding
+    if catEnc == 'Label':
+      X_df_encode = Labaling_V2(X_df_drop)
+    elif catEnc == 'Factorazie':
+      X_df_encode = factorization(X_df_drop,categorical_cols)
+
+    ## missing features - impute features
+    I = Impute_class(X=X_df_encode)
+    # categorical features
+    if impCat == "KNN":
+      I.impute_values(cols=categorical_cols, method= impCat, K=10)
+    else: 
+      I.impute_values(cols=categorical_cols, method= impCat)
+    # int features
+    if impInt == "KNN":
+      I.impute_values(cols= int_cols, method= impInt, K=10)
+    else:
+      I.impute_values(cols= int_cols, method= impInt)
+    # float features
+    if impFloat == "KNN":
+      I.impute_values(cols= float_cols, method= impFloat, K=10)
+    else:
+      I.impute_values(cols= float_cols, method= impFloat)
     X_df_impute2 = I.X
 
     ## Taking care of skewed target
     Y_price_log = np.log1p(Y_price)
 
+    # Normalize
+    X_norm = X_df_impute2
+    # X_norm =  pd.DataFrame(stats.zscore(X_df_impute2))
+    # X_norm.columns = X_df_impute2.columns
+
     # indexing
-    X_train = X_df_impute2[tr_idx].drop(['SalePrice'], axis=1)
+    X_train = X_norm[tr_idx].drop(['SalePrice'], axis=1)
     Y_train = Y_price_log[tr_idx]
     te_idx = [not elem for elem in tr_idx]
     te_idx = pd.Series(te_idx)
-    X_test = np.log1p(Y_price)
+    X_test = X_norm[te_idx].drop(['SalePrice'], axis=1)
 
 
     # return X_train, Y_train, X_test, Y_test, categorical_cols, tr_idx, te_idx
     return X_train, Y_train, X_test
 
-x_train, y_train, x_test = initialize_data()
-
-print(x_train.shape)
-print(y_train.shape)
+# Data initialize
+# x_train, y_train, x_test = initialize_data(impCat = "most_frequent", impInt = "median", impFloat = "KNN")
+x_train, y_train, x_test = initialize_data(impCat = "most_frequent", impInt = "median", impFloat = "KNN")
+# Data split
 Xtrain, Xvalid, ytrain, yvalid = train_test_split(x_train, y_train, test_size = 0.3, random_state = 0)
-print("Xtrain : " + str(Xtrain.shape))
-print("Xtest : " + str(Xvalid.shape))
-print("ytrain : " + str(ytrain.shape))
-print("ytest : " + str(yvalid.shape))
+# Train and evaluate diffrent models
+evaluate_model(data_train=Xtrain, data_valid=Xvalid, target_train=ytrain, target_valid=yvalid)
 
-MAE_array_train = []
-MAE_array_valid = []
-R2_array_train = []
-R2_array_valid = []
-RMSE_array_train = []
-RMSE_array_valid = []
+"""## 3.4 Hyperparameters
 
-R = Regression_model(Xtrain, ytrain)
-print("Linear Regression Model results:")
-R.Linear_reg()
-print("performences over Train set:")
-Score = R.score_dataset(Xtrain, ytrain)
-MAE_array_train.append(Score[0])
-R2_array_train.append(Score[1])
-RMSE_array_train.append(Score[2])
-print("\n")
-
-print("performences over Validation set:")
-Score = R.score_dataset(Xvalid, yvalid)
-MAE_array_valid.append(Score[0])
-R2_array_valid.append(Score[1])
-RMSE_array_valid.append(Score[2])
-print("\n")
-
-print("Lasso Regression Model results:")
-R.Lasso_reg([1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100])
-print("performences over Train set:")
-Score = R.score_dataset(Xtrain, ytrain)
-MAE_array_train.append(Score[0])
-R2_array_train.append(Score[1])
-RMSE_array_train.append(Score[2])
-print("\n")
-
-print("performences over Validation set:")
-Score = R.score_dataset(Xvalid, yvalid)
-MAE_array_valid.append(Score[0])
-R2_array_valid.append(Score[1])
-RMSE_array_valid.append(Score[2])
-print("\n")
-
-# print("Kernal Ridge Regression Model results:")
-# K_reg = R.KernelRidge_reg(10)
-# print("performences over Train set:")
-# R.score_dataset(Xtrain, ytrain)
-# print("\n")
-# print("performences over Validation set:")
-# R.score_dataset(Xvalid, yvalid)
-# print("\n")
-
-R.RidgeKfold_reg([1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100])
-print("Ridge Kfold Regression Model results:")
-print("performences over Train set:")
-Score = R.score_dataset(Xtrain, ytrain)
-MAE_array_train.append(Score[0])
-R2_array_train.append(Score[1])
-RMSE_array_train.append(Score[2])
-print("\n")
-
-print("performences over Validation set:")
-Score = R.score_dataset(Xvalid, yvalid)
-MAE_array_valid.append(Score[0])
-R2_array_valid.append(Score[1])
-RMSE_array_valid.append(Score[2])
-print("\n")
+### 3.4.1 impute_method
+"""
 
 fig, axs = plt.subplots(1, 3, figsize=(18, 6), sharey=False)
-axs[0].scatter(["Linear", "Lasso", "Ridge"], MAE_array_valid)
-axs[1].scatter(["Linear", "Lasso", "Ridge"], R2_array_valid)
-axs[2].scatter(["Linear", "Lasso", "Ridge"], RMSE_array_valid)
+
+impCat_vec = ["zero", "most_frequent", "mean", "median", "KNN"]
+# impInt_vec = ["zero", "most_frequent", "mean", "median", "KNN"]
+# impFloat_vec = ["zero", "most_frequent", "mean", "median", "KNN"]
+impInt_vec = ["median"]
+impFloat_vec = ["KNN"]
+
+for impCat_item in impCat_vec:
+  for impInt_item in impInt_vec:
+    for impFloat_item in impFloat_vec:
+      # Data initialize
+      # x_train, y_train, x_test = initialize_data(impCat = "most_frequent", impInt = "median", impFloat = "KNN")
+      x_train, y_train, x_test = initialize_data(impCat = impCat_item, impInt = impInt_item, impFloat = impFloat_item)
+      # Data split
+      Xtrain, Xvalid, ytrain, yvalid = train_test_split(x_train, y_train, test_size = 0.3, random_state = 0)
+      # Train and evaluate diffrent models
+      MAE_array_valid, R2_array_valid, RMSE_array_valid = evaluate_model(data_train=Xtrain, data_valid=Xvalid, target_train=ytrain, target_valid=yvalid, ifPrint=False)
+
+      axs[0].scatter(["Linear","Lasso", "Ridge"], MAE_array_valid, label ="impCat ={}, impInt ={}, impFloat ={}".format(impCat_item,impInt_item,impFloat_item))
+      axs[1].scatter(["Linear","Lasso", "Ridge"], R2_array_valid, label ="impCat ={}, impInt ={}, impFloat ={}".format(impCat_item,impInt_item,impFloat_item))
+      axs[2].scatter(["Linear","Lasso", "Ridge"], RMSE_array_valid, label ="impCat ={}, impInt ={}, impFloat ={}".format(impCat_item,impInt_item,impFloat_item))
+
 axs[0].set_ylabel("MAE")
 axs[1].set_ylabel("R2")
 axs[2].set_ylabel("RMSE")
@@ -1072,7 +1041,141 @@ axs[0].set_xlabel("Regression method")
 axs[1].set_xlabel("Regression method")
 axs[2].set_xlabel("Regression method")
 fig.suptitle('Regression methods Performences')
+plt.legend(bbox_to_anchor=(1.02, 0.1), loc='best', borderaxespad=0)
 plt.show()
+
+fig, axs = plt.subplots(1, 3, figsize=(18, 6), sharey=False)
+
+impCat_vec = ["most_frequent"]
+impInt_vec = ["zero", "most_frequent", "mean", "median", "KNN"]
+# impFloat_vec = ["zero", "most_frequent", "mean", "median", "KNN"]
+impFloat_vec = ["KNN"]
+
+for impCat_item in impCat_vec:
+  for impInt_item in impInt_vec:
+    for impFloat_item in impFloat_vec:
+      # Data initialize
+      # x_train, y_train, x_test = initialize_data(impCat = "most_frequent", impInt = "median", impFloat = "KNN")
+      x_train, y_train, x_test = initialize_data(impCat = impCat_item, impInt = impInt_item, impFloat = impFloat_item)
+      # Data split
+      Xtrain, Xvalid, ytrain, yvalid = train_test_split(x_train, y_train, test_size = 0.3, random_state = 0)
+      # Train and evaluate diffrent models
+      MAE_array_valid, R2_array_valid, RMSE_array_valid = evaluate_model(data_train=Xtrain, data_valid=Xvalid, target_train=ytrain, target_valid=yvalid, ifPrint=False)
+
+      axs[0].scatter(["Linear","Lasso", "Ridge"], MAE_array_valid, label ="impCat ={}, impInt ={}, impFloat ={}".format(impCat_item,impInt_item,impFloat_item))
+      axs[1].scatter(["Linear","Lasso", "Ridge"], R2_array_valid, label ="impCat ={}, impInt ={}, impFloat ={}".format(impCat_item,impInt_item,impFloat_item))
+      axs[2].scatter(["Linear","Lasso", "Ridge"], RMSE_array_valid, label ="impCat ={}, impInt ={}, impFloat ={}".format(impCat_item,impInt_item,impFloat_item))
+
+axs[0].set_ylabel("MAE")
+axs[1].set_ylabel("R2")
+axs[2].set_ylabel("RMSE")
+axs[0].set_xlabel("Regression method")
+axs[1].set_xlabel("Regression method")
+axs[2].set_xlabel("Regression method")
+fig.suptitle('Regression methods Performences')
+plt.legend(bbox_to_anchor=(1.02, 0.1), loc='best', borderaxespad=0)
+plt.show()
+
+fig, axs = plt.subplots(1, 3, figsize=(18, 6), sharey=False)
+
+impCat_vec = ["most_frequent"]
+impInt_vec = ["median"]
+impFloat_vec = ["zero", "most_frequent", "mean", "median", "KNN"]
+
+
+for impCat_item in impCat_vec:
+  for impInt_item in impInt_vec:
+    for impFloat_item in impFloat_vec:
+      # Data initialize
+      # x_train, y_train, x_test = initialize_data(impCat = "most_frequent", impInt = "median", impFloat = "KNN")
+      x_train, y_train, x_test = initialize_data(impCat = impCat_item, impInt = impInt_item, impFloat = impFloat_item)
+      # Data split
+      Xtrain, Xvalid, ytrain, yvalid = train_test_split(x_train, y_train, test_size = 0.3, random_state = 0)
+      # Train and evaluate diffrent models
+      MAE_array_valid, R2_array_valid, RMSE_array_valid = evaluate_model(data_train=Xtrain, data_valid=Xvalid, target_train=ytrain, target_valid=yvalid, ifPrint=False)
+
+      axs[0].scatter(["Linear","Lasso", "Ridge"], MAE_array_valid, label ="impCat ={}, impInt ={}, impFloat ={}".format(impCat_item,impInt_item,impFloat_item))
+      axs[1].scatter(["Linear","Lasso", "Ridge"], R2_array_valid, label ="impCat ={}, impInt ={}, impFloat ={}".format(impCat_item,impInt_item,impFloat_item))
+      axs[2].scatter(["Linear","Lasso", "Ridge"], RMSE_array_valid, label ="impCat ={}, impInt ={}, impFloat ={}".format(impCat_item,impInt_item,impFloat_item))
+
+axs[0].set_ylabel("MAE")
+axs[1].set_ylabel("R2")
+axs[2].set_ylabel("RMSE")
+axs[0].set_xlabel("Regression method")
+axs[1].set_xlabel("Regression method")
+axs[2].set_xlabel("Regression method")
+fig.suptitle('Regression methods Performences')
+plt.legend(bbox_to_anchor=(1.02, 0.1), loc='best', borderaxespad=0)
+plt.show()
+
+"""The best impute methods are: 
+* **Categorical features** - most_frequent
+* **Int features** - there is no different
+* **Float features** - most_frequent
+
+### 3.4.2 Categorical encoding
+"""
+
+fig, axs = plt.subplots(1, 3, figsize=(18, 6), sharey=False)
+
+Encoding_methods = ["Label","Factorazie"]
+
+
+for enc in Encoding_methods:
+  # Data initialize
+  # x_train, y_train, x_test = initialize_data(impCat = "most_frequent", impInt = "median", impFloat = "KNN")
+  x_train, y_train, x_test = initialize_data(impCat = "most_frequent", impInt = "median", impFloat = "most_frequent", catEnc = enc)
+  # Data split
+  Xtrain, Xvalid, ytrain, yvalid = train_test_split(x_train, y_train, test_size = 0.3, random_state = 0)
+  # Train and evaluate diffrent models
+  MAE_array_valid, R2_array_valid, RMSE_array_valid = evaluate_model(data_train=Xtrain, data_valid=Xvalid, target_train=ytrain, target_valid=yvalid, ifPrint=False)
+
+  axs[0].scatter(["Linear","Lasso", "Ridge"], MAE_array_valid, label ="Encoding method ={}".format(enc))
+  axs[1].scatter(["Linear","Lasso", "Ridge"], R2_array_valid, label ="Encoding method ={}".format(enc))
+  axs[2].scatter(["Linear","Lasso", "Ridge"], RMSE_array_valid, label ="Encoding method ={}".format(enc))
+
+axs[0].set_ylabel("MAE")
+axs[1].set_ylabel("R2")
+axs[2].set_ylabel("RMSE")
+axs[0].set_xlabel("Regression method")
+axs[1].set_xlabel("Regression method")
+axs[2].set_xlabel("Regression method")
+fig.suptitle('Regression methods Performences')
+plt.legend(bbox_to_anchor=(1.02, 0.1), loc='best', borderaxespad=0)
+plt.show()
+
+# Data initialize
+# x_train, y_train, x_test = initialize_data(impCat = "most_frequent", impInt = "median", impFloat = "KNN")
+x_train, y_train, x_test = initialize_data(impCat = "most_frequent", impInt = "median", impFloat = "most_frequent", catEnc = "Factorazie")
+# Data split
+Xtrain, Xvalid, ytrain, yvalid = train_test_split(x_train, y_train, test_size = 0.3, random_state = 0)
+# Train and evaluate diffrent models
+evaluate_model(data_train=Xtrain, data_valid=Xvalid, target_train=ytrain, target_valid=yvalid)
+
+"""## 4. Section 4: Submission"""
+
+# Feature engineering
+x_train, y_train, x_test = initialize_data(impCat = "most_frequent", impInt = "median", impFloat = "KNN")
+# Data split
+Xtrain, Xvalid, ytrain, yvalid = train_test_split(x_train, y_train, test_size = 0.3, random_state = 0)
+# Model implemantion
+R = Regression_model(Xtrain, ytrain)
+R.Linear_reg()
+# prediction
+pred_test = R.model.predict(x_test)
+# target correction
+target = np.expm1(pred_test)
+
+# make submission dataframe
+test = pd.read_csv(main_path + '/test.csv')
+submission =  pd.DataFrame(test['Id'])
+submission['SalePrice'] = target
+print(submission)
+
+# save to csv
+# ...
+
+"""### ++++++++++"""
 
 # Dor initialize function
 """
@@ -1117,8 +1220,6 @@ def initialize_data():
     
     return X_train, Y_train, X_test, Y_test, categorical_cols, tr_idx, te_idx
 """
-
-"""### ++++++++++"""
 
 fig, axs = plt.subplots(1, 3, figsize=(18, 6), sharey=False)
 for K_it in np.linspace(2,50,25, dtype= int):
